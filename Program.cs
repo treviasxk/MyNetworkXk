@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
 
 class Program{
    static IPEndPoint MyHost = new IPEndPoint(IPAddress.Any, 26950);
-
     static void Main(string[] args){
       MyNetworkClient.OnClientReceiveTCP += new ClientReceiveTCP(OnClientReceiveTCP);
       MyNetworkClient.OnClientReceiveUDP += new ClientReceiveUDP(OnClientReceiveUDP);
@@ -47,39 +45,39 @@ class Program{
 
    //========================== EVENTS SERVER ==========================
    static void OnServerStatus(object sender, DataServerReceiveArgs e){
-      if(e.NetworkStatus == NetworkStatus.Connected){
-         SharedCommands.CW(ConsoleColor.Green,"SERVER", $"{e.IPClient} conectou-se.");
+      if(e.NetworkStatus == MyNetworkServer.NetworkStatus.Connected){
+         Console.WriteLine($"{e.IPClient} conectou-se.");
       }
-      if(e.NetworkStatus == NetworkStatus.Disconnected){
-         SharedCommands.CW(ConsoleColor.Green,"SERVER", $"{e.IPClient} desconectou-se.");
+      if(e.NetworkStatus == MyNetworkServer.NetworkStatus.Disconnected){
+         Console.WriteLine($"{e.IPClient} desconectou-se.");
       }
    }
 
    static void OnServerReceiveTCP(object sender, DataServerReceiveArgs e){
-      SharedCommands.CW(ConsoleColor.Green, "CLIENT TCP",$"{(string)e.Data[0]}");
+      Console.WriteLine($"{e.IPClient}: {(string)e.Data[0]}");
       MyNetworkServer.SendBroadcastTCP(e.Data); //Send data to all clients TCP connected.
    }
 
    static void OnServerReceiveUDP(object sender, DataServerReceiveArgs e){
-       SharedCommands.CW(ConsoleColor.Green, "CLIENT UDP",$"{(string)e.Data[0]}");
+       Console.WriteLine($"{e.IPClient}: {(string)e.Data[0]}");
        MyNetworkServer.SendBroadcastUDP(e.Data); //Send data to all clients UDP connected.
    }
 
 
    //========================== EVENTS CLIENT ==========================
-   static void OnClientStatus(object sender, NetworkStatus e){
-     if(e == NetworkStatus.Connected){
-         SharedCommands.CW(ConsoleColor.Green,"CLIENT", "Conectado com o servidor.");
+   static void OnClientStatus(object sender, MyNetworkClient.NetworkStatus e){
+     if(e == MyNetworkClient.NetworkStatus.Connected){
+         Console.WriteLine("Conectado com o servidor.");
       }
-      if(e == NetworkStatus.Disconnected){
-         SharedCommands.CW(ConsoleColor.Green,"SERVER", "Sem conexão com o servidor.");
+      if(e == MyNetworkClient.NetworkStatus.Disconnected){
+         Console.WriteLine("Sem conexão com o servidor.");
       }
    }
 
    static void OnClientReceiveTCP(object sender, object[] data){
-      SharedCommands.CW(ConsoleColor.Green,"SERVER TCP",$"{(string)data[0]}");
+      Console.WriteLine($"SERVER: {(string)data[0]}");
    }
    static void OnClientReceiveUDP(object sender, object[] data){
-      SharedCommands.CW(ConsoleColor.Green,"SERVER UDP",$"{(string)data[0]}");
+      Console.WriteLine($"SERVER: {(string)data[0]}");
    }
 }

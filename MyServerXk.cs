@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Serialization.Formatters.Binary;
 
 public delegate void ServerReceiveTCP(object sender, DataServerReceiveArgs arg);
 public delegate void ServerReceiveUDP(object sender, DataServerReceiveArgs arg);
@@ -9,10 +11,16 @@ public delegate void ServerStatus(object sender, DataServerReceiveArgs args);
 public class DataServerReceiveArgs : EventArgs{
     public EndPoint IPClient;
     public object[] Data;
-    public NetworkStatus NetworkStatus;
+    public MyNetworkServer.NetworkStatus NetworkStatus;
 }
 [Serializable]
 public class MyNetworkServer{
+   public enum NetworkStatus {
+         Connected = 200,
+         Connecting = 100,
+         Disconnected = 400
+   }
+
    public static NetworkStatus MyStatus = NetworkStatus.Disconnected;
    public static Dictionary<EndPoint, Socket> ClientsTCP = new Dictionary<EndPoint, Socket>();
    public static Dictionary<EndPoint, IPEndPoint> ClientsUDP = new Dictionary<EndPoint, IPEndPoint>();
@@ -31,7 +39,7 @@ public class MyNetworkServer{
       Console.WriteLine("  LICENÇA:                                GPL-3.0 License");
       Console.WriteLine("  VERSÃO:                                 1.0.0.0");
       Console.WriteLine(" =========================================================");
-      SharedCommands.CW(ConsoleColor.Green,"SERVER", "Iniciando servidor...");
+      CW(ConsoleColor.Green,"SERVER", "Iniciando servidor...");
       MyStatus = NetworkStatus.Connecting;
       ServerUDP = new UdpClient(Host);
       ServerUDP.BeginReceive(new AsyncCallback(ServerReceiveUDPCallback), null);
@@ -39,7 +47,7 @@ public class MyNetworkServer{
       ServerTCP.Bind(Host);
       ServerTCP.Listen(1);
       ServerTCP.BeginAccept(new AsyncCallback(ServerTCPCallback), null);
-      SharedCommands.CW(ConsoleColor.Green,"SERVER","Servidor TCP/UDP está hospedado na porta: " + Host.Port.ToString());
+      CW(ConsoleColor.Green,"SERVER","Servidor TCP/UDP está hospedado na porta: " + Host.Port.ToString());
       MyStatus = NetworkStatus.Connected;
       while(onserver){
          switch(Console.ReadLine()){
@@ -47,10 +55,10 @@ public class MyNetworkServer{
                StopServer();
             break;
             case "onlines":
-               SharedCommands.CW(ConsoleColor.Green,"INFO", $"Onlines: {MyNetworkServer.ClientsTCP.Count}");
+               CW(ConsoleColor.Green,"INFO", $"Onlines: {MyNetworkServer.ClientsTCP.Count}");
             break;
             default: 
-               SharedCommands.CW(ConsoleColor.Green,"INFO", "Comando inválido!");
+               CW(ConsoleColor.Green,"INFO", "Comando inválido!");
             break;
          }
       }
@@ -58,7 +66,7 @@ public class MyNetworkServer{
 
    public static void StopServer(){
       Console.Clear();
-      SharedCommands.CW(ConsoleColor.Green,"SERVER", "Desligando servidor...");
+      CW(ConsoleColor.Green,"SERVER", "Desligando servidor...");
       ServerUDP.Close();
       ServerTCP.Close();
       MyStatus = NetworkStatus.Disconnected;
@@ -88,12 +96,12 @@ public class MyNetworkServer{
          }else{
             byte[] buffer = new byte[received];
             Array.Copy(receiveBuffer, buffer, received);
-            object[] DataReceive = (object[])SharedCommands.ByteArrayToObject(buffer);
+            object[] DataReceive = (object[])ByteArrayToObject(buffer);
             if(DataReceive != null){
                _myNetworkServer.RaiseServerReceiveTCP(_client.RemoteEndPoint, DataReceive);
                _client.BeginReceive(receiveBuffer, 0, receiveBuffer.Length, SocketFlags.None, new AsyncCallback(ServerReceiveTCPCallback), _client);
             }else{
-               SharedCommands.CW(ConsoleColor.Red,"AVISO", "O servidor está sobrecarregado!");
+               CW(ConsoleColor.Red,"AVISO", "O servidor está sobrecarregado!");
                DisconnectClient(_client);
             }
          }
@@ -157,21 +165,21 @@ public class MyNetworkServer{
    }
    
    public static void SendBroadcastTCP(object[] _data){
-      byte[] buffer = SharedCommands.ObjectToByteArray(_data);
+      byte[] buffer = ObjectToByteArray(_data);
       foreach (Socket _client in MyNetworkServer.ClientsTCP.Values){
-         _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SharedCommands.SendCallback), _client);
+         _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), _client);
       }
    }
 
    public static void SendUnicastTCP(Socket _client, object[] _data){
-      byte[] buffer = SharedCommands.ObjectToByteArray(_data);
-      _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SharedCommands.SendCallback), _client);
+      byte[] buffer = ObjectToByteArray(_data);
+      _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), _client);
    }
 
    public static void SendMulticastTCP(Socket[] Clients, object[] _data){
-      byte[] buffer = SharedCommands.ObjectToByteArray(_data);
+      byte[] buffer = ObjectToByteArray(_data);
       foreach (Socket _client in Clients){
-         _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SharedCommands.SendCallback), _client);
+         _client.BeginSend(buffer,0,buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), _client);
       }
    }
 
@@ -182,7 +190,7 @@ public class MyNetworkServer{
          if(data.Length < 4){
             return; // pacotes perdido
          }
-         object[] DataReceive = (object[])SharedCommands.ByteArrayToObject(data);
+         object[] DataReceive = (object[])ByteArrayToObject(data);
          switch((string)DataReceive[0]){
             case "registerudp":
                ConnectClientUDP(_client, DataReceive);
@@ -209,14 +217,51 @@ public class MyNetworkServer{
    }
 
    public static void SendUnicastUDP(IPEndPoint _client, object[] _data){
-      byte[] buffer = SharedCommands.ObjectToByteArray(_data);
+      byte[] buffer = ObjectToByteArray(_data);
       ServerUDP.BeginSend(buffer, buffer.Length, _client, null, null);
    }
 
    public static void SendBroadcastUDP(object[] _data){
-      byte[] buffer = SharedCommands.ObjectToByteArray(_data);
+      byte[] buffer = ObjectToByteArray(_data);
       foreach (IPEndPoint _client in MyNetworkServer.ClientsUDP.Values){
          ServerUDP.BeginSend(buffer, buffer.Length, _client, null, null);
+      }
+   }
+
+   static void CW(ConsoleColor _color, string title, string text){
+      Console.ForegroundColor = _color;
+      Console.Write("[{0}] ", title);
+      Console.ResetColor();
+      Console.WriteLine(text);
+   }
+
+    static void SendCallback(IAsyncResult _result){
+      try{
+         Socket _client = (Socket)_result.AsyncState;
+         _client.EndSend(_result);
+      }catch{}
+
+    }
+
+    static byte[] ObjectToByteArray(object obj){
+    BinaryFormatter bf = new BinaryFormatter();
+      using (var ms = new MemoryStream()){
+         bf.Serialize(ms, obj);
+         return ms.ToArray();
+      }
+   }
+
+   static object ByteArrayToObject(byte[] arrBytes){
+      using (var memStream = new MemoryStream()){
+         var binForm = new BinaryFormatter();
+         memStream.Write(arrBytes, 0, arrBytes.Length);
+         memStream.Seek(0, SeekOrigin.Begin);
+         try{
+            return binForm.Deserialize(memStream);
+         }
+         catch{
+            return null;
+         }
       }
    }
 }
