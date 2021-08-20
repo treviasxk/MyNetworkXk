@@ -3,7 +3,7 @@ using System.Net;
 
 class Program{
    static IPEndPoint MyHost = new IPEndPoint(IPAddress.Any, 26950);
-    static void Main(string[] args){
+   static void Main(string[] args){
       MyNetworkClient.OnClientReceiveTCP += new ClientReceiveTCP(OnClientReceiveTCP);
       MyNetworkClient.OnClientReceiveUDP += new ClientReceiveUDP(OnClientReceiveUDP);
       MyNetworkClient.OnClientStatus += new ClientStatus(OnClientStatus);

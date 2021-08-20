@@ -17,7 +17,7 @@ public class MyNetworkClient {
    public static event ClientReceiveTCP OnClientReceiveTCP;
    public static event ClientReceiveUDP OnClientReceiveUDP;
    public static event ClientStatus OnClientStatus;
-   static Socket ClientTCP = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+   static Socket ClientTCP;
    static byte[] receiveBuffer = new byte[1024];
    static MyNetworkClient _myNetworkClient = new MyNetworkClient();
    public static NetworkStatus MyStatus = NetworkStatus.Disconnected;
@@ -25,7 +25,7 @@ public class MyNetworkClient {
    static IPEndPoint MyHost;
      
     public static void ConnectServer(IPEndPoint Host){
-       Console.Clear();
+      Console.Clear();
       try{
          _myNetworkClient.RaiseClientStatus(NetworkStatus.Connecting);
          MyHost = Host;
@@ -33,6 +33,7 @@ public class MyNetworkClient {
          ClientUDP.Connect(Host);
          ClientUDP.BeginReceive(new AsyncCallback(ClientReceiveUDPCallback), null);
 
+         ClientTCP = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
          ClientTCP.Connect(Host.Address, Host.Port);
          ClientTCP.BeginReceive(receiveBuffer, 0, receiveBuffer.Length, SocketFlags.None, new AsyncCallback(ClientReceiveTCPCallback), ClientTCP);
       }catch(SocketException){
@@ -96,7 +97,7 @@ public class MyNetworkClient {
    }
 
    public static void SendUDP(object[] _data){
-      if(ClientUDP != null){
+      if(ClientUDP != null && MyStatus != NetworkStatus.Disconnected){
          byte[] buffer = ObjectToByteArray(_data);
          ClientUDP.BeginSend(buffer, buffer.Length, null, null);
       }
